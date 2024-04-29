@@ -1,0 +1,12 @@
+---
+
+service:
+  cluster_name: main_machine
+  app_name: teastore
+  name: teastore-webui
+
+---
+
+application:
+  cluster_name: main_machine
+  name: teastore

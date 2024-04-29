@@ -1,0 +1,40 @@
+---
+cluster:
+  hostname: example.local
+  node_taints: 
+    - node1
+    - node2
+  name: main_machine
+  api_token: <token_from_k8s>
+  ca_file: ca.crt
+  port: 6443
+
+---
+
+application:
+  cluster_name: main_machine
+  app_name: teastore
+  namespace: default
+  monitor_filters: container.name contains k8s_teastore
+
+---
+
+service:
+  cluster_name: main_machine
+  app_name: teastore
+  name: teastore-webui
+  docker_image_name: teastore/teastore-webui
+  passive_measure: True
+  algo_name: stide
+  algo_params: 
+    window: 3
+  
+---
+
+release:
+  cluster_name: main_machine
+  app_name: teastore
+  service_name: teastore-webui
+  version: 1.3.8
+  image_tag: 1.3.8-7.0.57
+  docker_image_sha: sha256:973c9bdd9d3615ba12404033095586936249d41e472382f3acaacdb4b7d4a517

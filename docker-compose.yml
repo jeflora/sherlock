@@ -1,0 +1,211 @@
+version: '3'
+services:
+  redis_pubsub_traces:
+    container_name: redis_pubsub_traces
+    image: redislabs/redismod:preview
+    expose:
+      - "6379"
+    ports:
+      - "6379:6379"
+
+  k8s_daemon_mongo:
+    container_name: k8s_daemon_mongo
+    restart: on-failure
+    image: mongo:6.0.13
+    volumes:
+      - $HDD/uSherlock_volumes/k8s_daemon_mongo_data:/data/db:rw
+    expose:
+      - "27017"
+
+  k8s_daemon:
+    container_name: k8s_daemon
+    restart: on-failure
+    image: usherlock/k8s_daemon:latest
+    build:
+      context: src/k8s_daemon
+      dockerfile: Dockerfile
+    expose:
+      - "80"
+    volumes:
+      - ./src/k8s_daemon:/code:rw
+      - $HDD/uSherlock_volumes/k8s_daemon_files:/crt_files:rw
+
+  api_server:
+    container_name: api_server
+    restart: on-failure
+    image: usherlock/api_server:latest
+    build:
+      context: src/api_server
+      dockerfile: Dockerfile
+    expose:
+      - "80"
+    ports:
+      - "80:80"
+    volumes:
+      - ./src/api_server:/code:rw
+
+  monitor_agent_db:
+    container_name: monitor_agent_db
+    image: mariadb:latest
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/monitor_agent_db_root_password
+      MYSQL_DATABASE: data_traces_db
+      MYSQL_USER: monitor_agent_user
+      MYSQL_PASSWORD_FILE: /run/secrets/monitor_agent_db_password
+    volumes:
+      - $HDD/uSherlock_volumes/monitor_agent_db_data:/var/lib/mysql:rw
+      - ./src/monitor_agent/mariadb-entrypoint:/docker-entrypoint-initdb.d:ro
+    expose:
+      - "3306"
+    secrets:
+      - monitor_agent_db_root_password
+      - monitor_agent_db_password
+
+  monitor_agent:
+    depends_on:
+      - monitor_agent_db
+    container_name: monitor_agent
+    restart: on-failure
+    image: usherlock/monitor_agent:latest
+    build:
+      context: src/monitor_agent
+      dockerfile: Dockerfile
+    environment:
+      DB_DATABASE: data_traces_db
+      DB_USER: monitor_agent_user
+      DB_PASSWORD_FILE: /run/secrets/monitor_agent_db_password
+    volumes:
+      - ./src/monitor_agent:/code:rw
+      - $HDD/uSherlock_volumes/data_traces:/data_traces:rw
+    expose:
+      - "80"
+    secrets:
+      - monitor_agent_db_password
+
+  redis_proc_data:
+    container_name: redis_proc_data
+    image: redislabs/redismod:preview
+    expose:
+      - "6379"
+
+  data_proc_agent:
+    container_name: data_proc_agent
+    restart: on-failure
+    image: usherlock/data_proc_agent:latest
+    build:
+      context: src/data_proc_agent
+      dockerfile: Dockerfile
+    environment:
+      DB_DATABASE: processingjobs
+    volumes:
+      - ./src/data_proc_agent:/code:rw
+    expose:
+      - "80"
+
+  management_engine_mongo:
+    container_name: management_engine_mongo
+    restart: on-failure
+    image: mongo:6.0.13
+    volumes:
+      - $HDD/uSherlock_volumes/management_engine_mongo_data:/data/db:rw
+    expose:
+      - "27017"
+
+  management_engine:
+    depends_on:
+      - management_engine_mongo
+    container_name: management_engine
+    restart: on-failure
+    image: usherlock/management_engine:latest
+    build:
+      context: src/management_engine
+      dockerfile: Dockerfile
+    expose:
+      - "80"
+    ports:
+      - "9001:80"
+    volumes:
+      - ./src/management_engine:/code:rw
+
+  detection_reports_mongo:
+    container_name: detection_reports_mongo
+    restart: on-failure
+    image: mongo:6.0.13
+    volumes:
+      - $HDD/uSherlock_volumes/detection_reports_mongo_data:/data/db:rw
+    expose:
+      - "27017"
+
+  detection_model_manager:
+    container_name: detection_model_manager
+    restart: on-failure
+    image: usherlock/detection_model_manager:latest
+    build:
+      context: src/detection_model_manager
+      dockerfile: Dockerfile
+    expose:
+      - "80"
+    ports:
+      - "9002:80"
+    volumes:
+      - ./src/detection_model_manager:/code:rw
+      - $HDD/uSherlock_volumes/models_dir:/models_dir:rw
+
+  mape_unit:
+    container_name: mape_unit
+    restart: on-failure
+    image: usherlock/mape_unit:latest
+    build:
+      context: src/mape_unit
+      dockerfile: Dockerfile
+    expose:
+      - "80"
+    ports:
+      - "9003:80"
+    volumes:
+      - ./src/mape_unit:/code:rw
+
+  metrics_engine_mongo:
+    container_name: metrics_engine_mongo
+    restart: on-failure
+    image: mongo:6.0.13
+    volumes:
+      - $HDD/uSherlock_volumes/metrics_engine_mongo_data:/data/db:rw
+    expose:
+      - "27017"
+
+  metrics_engine:
+    depends_on:
+      - metrics_engine_mongo
+    container_name: metrics_engine
+    restart: on-failure
+    image: usherlock/metrics_engine:latest
+    build:
+      context: src/metrics_engine
+      dockerfile: Dockerfile
+    expose:
+      - "80"
+    ports:
+      - "9004:80"
+    volumes:
+      - ./src/metrics_engine:/code:rw
+
+  webapp:
+    container_name: webapp
+    image: usherlock/webapp:latest
+    build:
+      context: src/webapp
+      dockerfile: Dockerfile
+    expose:
+      - "3000"
+    ports:
+      - "8080:3000"
+    volumes:
+      - ./src/webapp:/app:rw
+
+
+secrets:
+  monitor_agent_db_root_password:
+    file: ./secrets/monitor_agent_db_root_password.txt
+  monitor_agent_db_password:
+    file: ./secrets/monitor_agent_db_password.txt

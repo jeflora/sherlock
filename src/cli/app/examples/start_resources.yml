@@ -1,0 +1,20 @@
+---
+
+monitor:
+  app_name: teastore
+  monitor_filters: 
+    - "container.name contains k8s_teastore"
+
+---
+
+training:
+  app_name: teastore
+  service_name: teastore-webui
+  ttime: 10
+
+---
+
+detection:
+  app_name: teastore
+  model_id: asdasww
+  ttime: 10
